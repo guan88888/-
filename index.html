@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#071013">
+  <meta name="description" content="星门纪元：银河分裂，一款可离线游玩的单人星际战争桌游。">
+  <title>星门纪元：银河分裂</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="noise" aria-hidden="true"></div>
+  <div id="app">
+    <section id="start-screen" class="start-screen">
+      <div class="start-copy">
+        <p class="eyebrow">离线战略桌游</p>
+        <h1>星门纪元<br><span>银河分裂</span></h1>
+        <p class="intro">沿星门扩张、集结舰队、夺取敌方首都。</p>
+        <div class="seed-row">
+          <label for="seed-input">本局星图代码</label>
+          <div class="seed-control">
+            <input id="seed-input" autocomplete="off" maxlength="12" value="STARGATE">
+            <button id="random-seed" class="icon-button" type="button" title="生成随机星图" aria-label="生成随机星图">换一组</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="faction-select" aria-labelledby="faction-title">
+        <div class="select-heading">
+          <span id="faction-title">选择你的阵营</span>
+          <span>其余势力由战术 AI 接管</span>
+        </div>
+        <div class="faction-options">
+          <button class="faction-card empire selected" data-faction="empire" type="button">
+            <span class="faction-index">帝</span>
+            <strong>残余银河帝国</strong>
+            <small>适合稳守，首都更难攻破</small>
+            <span class="trait">首都防御 +1</span>
+          </button>
+          <button class="faction-card alliance" data-faction="alliance" type="button">
+            <span class="faction-index">盟</span>
+            <strong>自由星域联盟</strong>
+            <small>适合扩张，开局多一颗星球</small>
+            <span class="trait">开局领地 +1</span>
+          </button>
+          <button class="faction-card chaos" data-faction="chaos" type="button">
+            <span class="faction-index">游</span>
+            <strong>破碎星域议会</strong>
+            <small>适合进攻，平局也能获胜</small>
+            <span class="trait">进攻平局获胜</span>
+          </button>
+        </div>
+        <div class="start-actions">
+          <button id="start-game" class="primary-button" type="button">开启星门</button>
+          <button id="start-tutorial" class="secondary-button" type="button">新手教学</button>
+        </div>
+        <p class="offline-note">无需网络，不读取或上传任何数据</p>
+      </div>
+    </section>
+
+    <main id="game-screen" class="game-screen" hidden>
+      <header class="topbar">
+        <div class="brand-lockup">
+          <span class="gate-mark" aria-hidden="true"></span>
+          <div><strong>星门纪元</strong><small>银河分裂</small></div>
+        </div>
+        <div class="round-readout">
+          <span>战争周期</span>
+          <strong><b id="round-value">1</b> / 12</strong>
+        </div>
+        <div class="resource-strip" aria-label="玩家资源">
+          <div><span>剩余行动</span><b id="ap-value">2</b></div>
+          <div><span>我的星球</span><b id="control-value">0</b></div>
+        </div>
+        <button id="help-button" class="text-button" type="button">新手指南</button>
+        <button id="restart-button" class="text-button danger" type="button">重开</button>
+      </header>
+
+      <section class="war-room">
+        <aside class="left-panel panel">
+          <div class="panel-title">
+            <span>战术指令</span>
+            <small>选择指令后点击星球</small>
+          </div>
+          <div id="action-list" class="action-list">
+            <button class="action-button active" data-action="expand" type="button">
+              <span class="action-glyph">扩</span><span><b>扩张</b><small>占领相邻的灰色星球</small></span><em>1</em>
+            </button>
+            <button class="action-button" data-action="attack" type="button">
+              <span class="action-glyph">攻</span><span><b>进攻</b><small>攻击相邻的敌方星球</small></span><em>1</em>
+            </button>
+            <button class="action-button" data-action="reinforce" type="button">
+              <span class="action-glyph">援</span><span><b>增援</b><small>让己方星球舰队 +1</small></span><em>1</em>
+            </button>
+          </div>
+          <div id="action-hint" class="action-hint">点击发亮的灰色星球完成扩张。</div>
+          <section id="faction-command" class="faction-command" aria-label="阵营技能">
+            <div class="command-heading">
+              <span id="faction-mini-name">帝国技能</span>
+              <button id="faction-manual-button" type="button">阵营手册</button>
+            </div>
+            <div id="passive-line" class="passive-line"><span>被动</span><p></p></div>
+            <button id="active-skill" class="skill-button" type="button">
+              <span class="skill-icon">锁</span>
+              <span><b>星门锁域</b><small>每轮一次</small></span>
+              <em>就绪</em>
+            </button>
+            <button id="ultimate-skill" class="skill-button ultimate" type="button">
+              <span class="skill-icon">整</span>
+              <span><b>银河重整</b><small>第 4 轮解锁</small></span>
+              <em>锁定</em>
+            </button>
+          </section>
+          <section class="diplomacy-panel" aria-label="外交系统">
+            <div class="command-heading"><span>外交频道</span><small id="diplomacy-status">未结盟</small></div>
+            <p>选择一个势力结盟，共同抵抗外星入侵。每轮一次。</p>
+            <div id="diplomacy-list" class="diplomacy-list"></div>
+          </section>
+          <button id="end-turn" class="primary-button end-turn" type="button">结束本轮</button>
+          <div class="turn-order">
+            <span>行动序列</span>
+            <div id="turn-order-list"></div>
+          </div>
+        </aside>
+
+        <section class="map-shell" aria-label="银河战术星图">
+          <div class="map-toolbar">
+            <div class="legend">
+              <span class="legend-empire">帝国</span>
+              <span class="legend-alliance">联盟</span>
+              <span class="legend-chaos">混沌</span>
+              <span class="legend-neutral">无主</span>
+              <span class="legend-alien">外星</span>
+            </div>
+            <div id="seed-display">星图 STARGATE</div>
+          </div>
+          <div id="galaxy-map" class="galaxy-map">
+            <svg id="gate-lines" aria-hidden="true"></svg>
+            <div class="map-core" aria-hidden="true"><span></span></div>
+            <div id="planet-layer"></div>
+            <div class="scanline" aria-hidden="true"></div>
+          </div>
+          <div class="map-status">
+            <span id="phase-status">等待你的指令</span>
+            <span><i class="pulse-key"></i> 发亮的星球可以点击 <i id="alien-alert" class="alien-alert" hidden></i></span>
+          </div>
+        </section>
+
+        <aside class="right-panel panel">
+          <div class="panel-title"><span>星球信息</span><small id="selected-code">未选择</small></div>
+          <div id="planet-detail" class="planet-detail empty-state">
+            <div class="radar-placeholder" aria-hidden="true"></div>
+            <p>点击星球查看归属与舰队</p>
+          </div>
+          <div class="log-header"><span>战争记录</span><button id="clear-log" type="button">清屏</button></div>
+          <div id="war-log" class="war-log" aria-live="polite"></div>
+        </aside>
+      </section>
+    </main>
+
+    <div id="modal-backdrop" class="modal-backdrop" hidden>
+      <section id="event-modal" class="modal event-modal" role="dialog" aria-modal="true" aria-labelledby="event-title" hidden>
+          <div class="event-sigil" id="event-sigil">战</div>
+        <p class="eyebrow">战争事件</p>
+        <h2 id="event-title">星门过载</h2>
+        <p id="event-lore"></p>
+        <div id="event-effect" class="event-effect"></div>
+        <button id="resolve-event" class="primary-button" type="button">确认战报</button>
+      </section>
+      <section id="help-modal" class="modal help-modal" role="dialog" aria-modal="true" aria-labelledby="help-title" hidden>
+        <button class="modal-close" data-close="help" type="button" aria-label="关闭">关闭</button>
+        <p class="eyebrow">作战协议</p>
+        <h2 id="help-title">一轮怎么玩</h2>
+        <div class="turn-flow" aria-label="回合顺序">
+          <div><span>1</span><b>选动作</b><small>扩、攻、援</small></div>
+          <i>›</i>
+          <div><span>2</span><b>点星球</b><small>只点发亮目标</small></div>
+          <i>›</i>
+          <div><span>3</span><b>行动两次</b><small>也可使用技能</small></div>
+          <i>›</i>
+          <div><span>4</span><b>结束本轮</b><small>事件与敌方行动</small></div>
+        </div>
+        <div class="rules-grid">
+          <article><b>每轮行动两次</b><p>选择扩张、进攻或增援，再点击发亮的目标。</p></article>
+          <article><b>只能走星门线</b><p>扩张和进攻必须连接着一颗自己的星球。</p></article>
+          <article><b>舰队越多越强</b><p>进攻时双方舰队加一次掷骰，数字较大的一方获胜。</p></article>
+          <article><b>占领最多就赢</b><p>夺取敌方首都立即获胜，否则第 12 轮按星球数量结算。</p></article>
+          <article><b>外交与入侵</b><p>每轮可与一个势力结盟。约四分之一概率出现强大的外星系远征军。</p></article>
+        </div>
+        <p class="rule-foot">记住：扩张抢地，进攻抢敌人，增援保护重要星球。</p>
+        <button id="replay-tutorial" class="secondary-button replay-tutorial" type="button">重新播放新手教学</button>
+      </section>
+      <section id="tutorial-modal" class="modal tutorial-modal" role="dialog" aria-modal="true" aria-labelledby="tutorial-title" hidden>
+        <div class="tutorial-progress" id="tutorial-progress"><span></span><span></span><span></span><span></span></div>
+        <div id="tutorial-visual" class="tutorial-visual" aria-hidden="true"></div>
+        <p class="eyebrow">新手导航</p>
+        <h2 id="tutorial-title">目标：占领敌方首都</h2>
+        <p id="tutorial-copy">你控制青色星球。沿着星门线前进，夺取任意敌方首都即可立刻获胜。</p>
+        <div class="tutorial-tip" id="tutorial-tip">圆环更大的星球就是首都。</div>
+        <div class="tutorial-actions">
+          <button id="tutorial-skip" class="secondary-button" type="button">跳过</button>
+          <button id="tutorial-next" class="primary-button" type="button">下一步</button>
+        </div>
+      </section>
+      <section id="faction-modal" class="modal faction-modal" role="dialog" aria-modal="true" aria-labelledby="faction-manual-title" hidden>
+        <button class="modal-close" data-close="faction" type="button" aria-label="关闭">关闭</button>
+        <p class="eyebrow">阵营作战手册</p>
+        <h2 id="faction-manual-title">残余银河帝国</h2>
+        <p id="faction-manual-role" class="manual-role"></p>
+        <div id="faction-manual-grid" class="manual-grid"></div>
+        <div id="faction-weakness" class="weakness-line"></div>
+      </section>
+      <section id="result-modal" class="modal result-modal" role="dialog" aria-modal="true" aria-labelledby="result-title" hidden>
+        <p class="eyebrow" id="result-kicker">战役结束</p>
+        <h2 id="result-title">银河归于统一</h2>
+        <p id="result-copy"></p>
+        <div id="score-board" class="score-board"></div>
+        <div class="result-actions">
+          <button id="same-seed" class="secondary-button" type="button">同星图再战</button>
+          <button id="new-game" class="primary-button" type="button">返回阵营选择</button>
+        </div>
+      </section>
+    </div>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  </div>
+  <script src="./game.js"></script>
+</body>
+</html>
