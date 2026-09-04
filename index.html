@@ -94,6 +94,9 @@
             <button class="action-button" data-action="reinforce" type="button">
               <span class="action-glyph">援</span><span><b>增援</b><small>让己方星球舰队 +1</small></span><em>1</em>
             </button>
+            <button class="action-button" data-action="maneuver" type="button">
+              <span class="action-glyph">调</span><span><b>舰队调度</b><small>选择舰队，再点任意星球</small></span><em>1</em>
+            </button>
           </div>
           <div id="action-hint" class="action-hint">点击发亮的灰色星球完成扩张。</div>
           <section id="faction-command" class="faction-command" aria-label="阵营技能">
@@ -126,7 +129,7 @@
               <option value="pioneer">开拓舰队 · 扩张</option>
               <option value="raider">劫掠舰队 · 游击</option>
             </select>
-            <div class="fleet-actions"><button id="buy-fleet" type="button">购买舰队 <span>8 信用 / 4 材料</span></button><button id="upgrade-fleet" type="button">升级驻守舰队 <span>6 信用 / 3 材料</span></button></div>
+            <div class="fleet-actions"><button id="buy-fleet" type="button">购买舰队 <span>8 信用 / 4 材料</span></button><button id="upgrade-fleet" type="button">升级驻守舰队 <span>6 信用 / 3 材料</span></button><button id="configure-fleet" type="button">配置舰队类型</button></div>
             <p id="fleet-hint">先在地图选择己方星球，再购买或升级舰队。</p>
           </section>
           <section class="save-panel" aria-label="存档系统">

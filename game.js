@@ -80,7 +80,8 @@ const EVENTS = [
 const ACTION_HINTS = {
   expand: "点击发亮的灰色星球完成扩张。",
   attack: "点击发亮的敌方星球发起进攻。舰队越多越容易获胜。",
-  reinforce: "点击任意己方星球，让它的舰队增加 1。"
+  reinforce: "点击任意己方星球，让它的舰队增加 1。",
+  maneuver: "先点击己方星球选择出发舰队，再点击任意星球：同阵营则调动，敌方则远程进攻。"
 };
 
 const $ = selector => document.querySelector(selector);
@@ -140,7 +141,7 @@ function createGame(seed, playerFaction) {
     };
   });
   return {
-    seed, rng, playerFaction, round: 1, phase: "player", actions: 2, action: "expand", selectedPlanet: null,
+    seed, rng, playerFaction, round: 1, phase: "player", actions: 2, action: "expand", selectedPlanet: null, maneuverSource: null,
     planets, edges: EDGES.map(([a,b]) => ({ a, b })), capitals, eventDeck: shuffle(EVENTS, rng), logs: [], gameOver: false,
     activeUsed: false, ultimateUsed: false, skillMode: null, shielded: null, empireHeld: territoryCountFor(planets, "empire"), order: 0,
     diplomacy: null, diplomacyUsed: false, alienActive: false, alienDefeated: false, credits: 24, materials: 14
@@ -173,6 +174,7 @@ function init() {
   $("#ultimate-skill").addEventListener("click", useUltimate);
   $("#diplomacy-list").addEventListener("click", event => { const button = event.target.closest("button[data-faction]"); if (button) formDiplomacy(button.dataset.faction); });
   $("#buy-fleet").addEventListener("click", buyFleet); $("#upgrade-fleet").addEventListener("click", upgradeFleet); $("#save-game").addEventListener("click", saveGame); $("#load-game").addEventListener("click", loadGame);
+  $("#configure-fleet").addEventListener("click", configureFleet);
   $("#restart-button").addEventListener("click", () => { if (confirm("放弃当前战役并返回阵营选择？")) returnToStart(); });
   $("#clear-log").addEventListener("click", () => { state.logs = []; renderLog(); });
   $("[data-close='help']").addEventListener("click", closeModals);
@@ -268,13 +270,22 @@ function isValidTarget(p) {
 function selectAction(action) {
   if (!state || state.phase !== "player") return;
   state.skillMode = null;
+  state.maneuverSource = null;
   state.action = action;
   $$(".action-button").forEach(button => button.classList.toggle("active", button.dataset.action === action));
   $("#action-hint").textContent = ACTION_HINTS[action];
   renderMap();
 }
 
+function configureFleet() {
+  const p = state.selectedPlanet ? planet(state.selectedPlanet) : null;
+  if (!p || p.owner !== state.playerFaction) return showToast("请选择己方星球上的舰队。", true);
+  p.fleetType = $("#fleet-type-select").value;
+  log(`${p.name}已配置为${FLEET_TYPES[p.fleetType].name}。`, "good"); renderAll();
+}
+
 function clickPlanet(id) {
+  if (state.action === "maneuver" && state.phase === "player" && state.actions > 0) return handleManeuver(id);
   state.selectedPlanet = id;
   const target = planet(id);
   renderMap();
@@ -285,6 +296,28 @@ function clickPlanet(id) {
   }
   if (state.phase !== "player" || state.actions < 1 || !isValidTarget(target)) return;
   performPlayerAction(target);
+}
+
+function handleManeuver(id) {
+  const target = planet(id);
+  if (!state.maneuverSource) {
+    if (target.owner !== state.playerFaction) return showToast("请先选择己方舰队作为出发点。", true);
+    state.maneuverSource = id; state.selectedPlanet = id;
+    $("#action-hint").textContent = `已选择${target.name}的舰队，现在点击任意目标。`;
+    renderMap(); renderDetail(); return;
+  }
+  const source = planet(state.maneuverSource); if (!source || source.id === id) return;
+  state.actions--;
+  if (target.owner === state.playerFaction) {
+    const moved = Math.max(1, Math.floor(source.fleet / 2)); source.fleet -= moved; target.fleet += moved; target.fleetType = source.fleetType;
+    log(`${moved} 支舰队从${source.name}调动至${target.name}（无视星门距离）。`, "good");
+  } else if (target.owner !== "neutral" && target.owner !== "alien") {
+    const attack = source.fleet + (FLEET_TYPES[source.fleetType]?.attack || 0) + Math.floor(state.rng() * 6) - 2;
+    const defense = target.fleet + (FLEET_TYPES[target.fleetType]?.defense || 0) + Math.floor(state.rng() * 6);
+    if (attack > defense || (state.playerFaction === "chaos" && attack === defense)) { const old = target.owner; target.owner = state.playerFaction; target.fleet = 1; target.fleetType = source.fleetType; source.fleet = Math.max(1, source.fleet - 1); log(`远程突袭${target.name}成功（${attack} : ${defense}）。`, "good"); checkCapital(target, state.playerFaction, old); }
+    else { source.fleet = Math.max(1, source.fleet - 1); log(`远程突袭${target.name}失败（${attack} : ${defense}），距离造成 -2 惩罚。`, "bad"); }
+  } else { state.actions++; return showToast("外星或无主目标请使用常规行动。", true); }
+  state.maneuverSource = null; state.selectedPlanet = id; renderAll();
 }
 
 function performPlayerAction(target) {
