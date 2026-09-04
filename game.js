@@ -34,6 +34,7 @@ const FACTION_KITS = {
     weakness: "弱点：防守战力 -1，被连续进攻时很脆弱。"
   }
 };
+const FLEET_TYPES = { assault:{name:"突击舰队",icon:"攻",attack:2,defense:0}, guardian:{name:"守卫舰队",icon:"守",attack:0,defense:2}, pioneer:{name:"开拓舰队",icon:"拓",attack:0,defense:0}, raider:{name:"劫掠舰队",icon:"劫",attack:1,defense:-1} };
 
 const PLANETS = [
   { id: "sol", name: "圣环", x: 17, y: 23, trait: "初代星门遗址。" },
@@ -134,6 +135,7 @@ function createGame(seed, playerFaction) {
       y: Math.max(10, Math.min(90, p.y + (rng() - .5) * 4)),
       owner,
       fleet: capitalFaction ? 4 : owner === "neutral" ? 1 + Math.floor(rng() * 2) : 2,
+      fleetType: owner === "neutral" ? "guardian" : (capitalFaction ? "guardian" : ["assault","guardian","pioneer"][Math.floor(rng()*3)]),
       capitalFaction
     };
   });
@@ -141,7 +143,7 @@ function createGame(seed, playerFaction) {
     seed, rng, playerFaction, round: 1, phase: "player", actions: 2, action: "expand", selectedPlanet: null,
     planets, edges: EDGES.map(([a,b]) => ({ a, b })), capitals, eventDeck: shuffle(EVENTS, rng), logs: [], gameOver: false,
     activeUsed: false, ultimateUsed: false, skillMode: null, shielded: null, empireHeld: territoryCountFor(planets, "empire"), order: 0,
-    diplomacy: null, diplomacyUsed: false, alienActive: false, alienDefeated: false
+    diplomacy: null, diplomacyUsed: false, alienActive: false, alienDefeated: false, credits: 24, materials: 14
   };
 }
 
@@ -170,6 +172,7 @@ function init() {
   $("#active-skill").addEventListener("click", armActiveSkill);
   $("#ultimate-skill").addEventListener("click", useUltimate);
   $("#diplomacy-list").addEventListener("click", event => { const button = event.target.closest("button[data-faction]"); if (button) formDiplomacy(button.dataset.faction); });
+  $("#buy-fleet").addEventListener("click", buyFleet); $("#upgrade-fleet").addEventListener("click", upgradeFleet); $("#save-game").addEventListener("click", saveGame); $("#load-game").addEventListener("click", loadGame);
   $("#restart-button").addEventListener("click", () => { if (confirm("放弃当前战役并返回阵营选择？")) returnToStart(); });
   $("#clear-log").addEventListener("click", () => { state.logs = []; renderLog(); });
   $("[data-close='help']").addEventListener("click", closeModals);
@@ -212,12 +215,13 @@ function beginGame() {
   }
 }
 
-function renderAll() { renderTopbar(); renderMap(); renderDetail(); renderLog(); renderTurnOrder(); renderActions(); renderFactionCommand(); renderDiplomacy(); }
+function renderAll() { renderTopbar(); renderMap(); renderDetail(); renderLog(); renderTurnOrder(); renderActions(); renderFactionCommand(); renderDiplomacy(); renderFleetPanel(); }
 
 function renderTopbar() {
   $("#round-value").textContent = state.round;
   $("#ap-value").textContent = state.actions;
   $("#control-value").textContent = territoryCount(state.playerFaction);
+  $("#credit-value").textContent = state.credits; $("#material-value").textContent = state.materials;
   $("#phase-status").textContent = state.phase === "player" ? "轮到你行动" : state.phase === "event" ? "发生战争事件" : "敌方正在行动";
   $("#alien-alert").hidden = !state.alienActive;
 }
@@ -233,7 +237,7 @@ function renderMap() {
     button.style.setProperty("--x", `${p.x}%`);
     button.style.setProperty("--y", `${p.y}%`);
     button.setAttribute("aria-label", `${p.name}，${FACTIONS[p.owner].name}，舰队 ${p.fleet}`);
-    button.innerHTML = `<span class="planet-orb">${p.fleet}</span><strong>${p.name}</strong><small>${p.capitalFaction ? "首都" : FACTIONS[p.owner].short}</small>`;
+    button.innerHTML = `<span class="planet-orb">${p.fleet}</span><strong>${p.name}</strong><small>${p.capitalFaction ? "首都" : FACTIONS[p.owner].short} · ${FLEET_TYPES[p.fleetType]?.icon || "舰"}</small>`;
     button.addEventListener("click", () => clickPlanet(p.id));
     layer.appendChild(button);
   });
@@ -289,11 +293,14 @@ function performPlayerAction(target) {
   if (state.action === "expand") {
     target.owner = faction;
     target.fleet = 1;
+    target.fleetType = "pioneer";
+    state.credits += 2; state.materials += 1;
     log(`${FACTIONS[faction].short}占领了${target.name}。`, "good");
   } else if (state.action === "attack") {
     resolveBattle(faction, target);
   } else {
     target.fleet++;
+    state.credits += 1;
     log(`${target.name}获得增援，舰队变为 ${target.fleet}。`, "good");
   }
   renderAll();
@@ -303,8 +310,8 @@ function performPlayerAction(target) {
 function resolveBattle(attacker, target) {
   const source = ownedBy(attacker).filter(p => neighbors(p.id).includes(target.id)).sort((a,b) => b.fleet - a.fleet)[0];
   if (!source) return;
-  const attackPower = source.fleet + 1 + Math.floor(state.rng() * 6);
-  let defensePower = target.fleet + 1 + Math.floor(state.rng() * 6);
+  const attackPower = source.fleet + 1 + Math.floor(state.rng() * 6) + (FLEET_TYPES[source.fleetType]?.attack || 0);
+  let defensePower = target.fleet + 1 + Math.floor(state.rng() * 6) + (FLEET_TYPES[target.fleetType]?.defense || 0);
   let finalAttack = attackPower;
   if (attacker === "alliance") finalAttack--;
   if (target.owner === "empire") defensePower++;
@@ -334,6 +341,7 @@ function checkCapital(target, attacker) {
 function endPlayerTurn() {
   if (state.phase !== "player" || state.gameOver) return;
   state.phase = "event";
+  state.credits += 3; state.materials += 2;
   state.selectedPlanet = null;
   const alienHit = !state.alienActive && state.rng() < 0.25;
   const event = alienHit ? triggerAlienInvasion() : state.eventDeck[(state.round - 1) % state.eventDeck.length];
@@ -364,6 +372,7 @@ async function runAISequence() {
   state.round++;
   state.phase = "player";
   state.actions = 2;
+  state.credits += 2; state.materials += 1;
   state.activeUsed = false;
   state.diplomacyUsed = false;
   state.skillMode = null;
@@ -388,6 +397,7 @@ function aiAction(faction) {
     const target = neutrals[Math.floor(state.rng() * neutrals.length)];
     target.owner = faction;
     target.fleet = 1;
+    target.fleetType = faction === "alliance" ? "pioneer" : "assault";
     log(`${FACTIONS[faction].short}占领了${target.name}。`, "bad");
   } else {
     strongest.fleet++;
@@ -419,6 +429,37 @@ function renderDiplomacy() {
   const options = ["empire", "alliance", "chaos"].filter(f => f !== state.playerFaction);
   list.innerHTML = options.map(f => `<button class="diplomacy-button${state.diplomacy === f ? " active" : ""}" data-faction="${f}" type="button" ${state.diplomacyUsed ? "disabled" : ""}>${state.diplomacy === f ? "已结盟" : `与${FACTIONS[f].short}结盟`}</button>`).join("");
   $("#diplomacy-status").textContent = state.diplomacy ? `与${FACTIONS[state.diplomacy].short}同盟` : state.diplomacyUsed ? "本轮已用" : "未结盟";
+}
+
+function renderFleetPanel() {
+  const p = state.selectedPlanet ? planet(state.selectedPlanet) : null;
+  $("#fleet-hint").textContent = p && p.owner === state.playerFaction ? `${p.name}：${FLEET_TYPES[p.fleetType]?.name || "舰队"} Lv${p.fleet}` : "先在地图选择己方星球，再购买或升级舰队。";
+}
+function buyFleet() {
+  const p = state.selectedPlanet ? planet(state.selectedPlanet) : null;
+  const type = $("#fleet-type-select").value;
+  if (!p || p.owner !== state.playerFaction) return showToast("请选择己方星球作为驻守点。", true);
+  if (state.credits < 8 || state.materials < 4) return showToast("信用点或材料不足。", true);
+  state.credits -= 8; state.materials -= 4; p.fleet++; p.fleetType = type;
+  log(`${p.name}购买并部署${FLEET_TYPES[type].name}。`, "good"); renderAll();
+}
+function upgradeFleet() {
+  const p = state.selectedPlanet ? planet(state.selectedPlanet) : null;
+  if (!p || p.owner !== state.playerFaction) return showToast("请选择己方星球作为升级目标。", true);
+  if (state.credits < 6 || state.materials < 3) return showToast("升级所需资源不足。", true);
+  state.credits -= 6; state.materials -= 3; p.fleet++;
+  log(`${p.name}的${FLEET_TYPES[p.fleetType]?.name || "舰队"}完成升级。`, "good"); renderAll();
+}
+function saveGame() {
+  if (!state) return;
+  const snapshot = {...state, rng: null};
+  try { localStorage.setItem("stargate-save", JSON.stringify(snapshot)); state.savedAt = Date.now(); showToast("战役已保存到本机。"); } catch { showToast("存档失败。", true); }
+}
+function loadGame() {
+  try {
+    const raw = localStorage.getItem("stargate-save"); if (!raw) return showToast("还没有可读取的存档。", true);
+    const data = JSON.parse(raw); state = {...data, rng: mulberry32(hashSeed(data.seed + "-resume")), eventDeck: shuffle(EVENTS, mulberry32(hashSeed(data.seed + "-events"))), phase:"player", gameOver:false}; beginGame(); showToast("已读取本机存档。");
+  } catch { showToast("存档读取失败。", true); }
 }
 
 function triggerAlienInvasion() {
@@ -471,7 +512,7 @@ function renderDetail() {
   $("#selected-code").textContent = p.id.toUpperCase();
   box.className = "planet-detail";
   box.style.setProperty("--owner-color", FACTIONS[p.owner].color);
-  box.innerHTML = `<div class="detail-name"><div><h3>${p.name}</h3><p>${p.capitalFaction ? "阵营首都" : "普通星球"}</p></div><span class="owner-badge">${FACTIONS[p.owner].short}</span></div><div class="detail-stats"><div><span>舰队</span><b>${p.fleet}</b></div><div><span>连接星门</span><b>${neighbors(p.id).length}</b></div></div><p class="detail-trait">${p.trait}</p>`;
+  box.innerHTML = `<div class="detail-name"><div><h3>${p.name}</h3><p>${p.capitalFaction ? "阵营首都" : "普通星球"}</p></div><span class="owner-badge">${FACTIONS[p.owner].short}</span></div><div class="detail-stats"><div><span>舰队</span><b>${p.fleet}</b></div><div><span>类型</span><b>${FLEET_TYPES[p.fleetType]?.name || "舰队"}</b></div></div><p class="detail-trait">${p.trait}</p>`;
 }
 
 function renderActions() {

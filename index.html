@@ -71,6 +71,8 @@
         <div class="resource-strip" aria-label="玩家资源">
           <div><span>剩余行动</span><b id="ap-value">2</b></div>
           <div><span>我的星球</span><b id="control-value">0</b></div>
+          <div><span>信用点</span><b id="credit-value">0</b></div>
+          <div><span>材料</span><b id="material-value">0</b></div>
         </div>
         <button id="help-button" class="text-button" type="button">新手指南</button>
         <button id="restart-button" class="text-button danger" type="button">重开</button>
@@ -115,6 +117,21 @@
             <div class="command-heading"><span>外交频道</span><small id="diplomacy-status">未结盟</small></div>
             <p>选择一个势力结盟，共同抵抗外星入侵。每轮一次。</p>
             <div id="diplomacy-list" class="diplomacy-list"></div>
+          </section>
+          <section class="fleet-panel" aria-label="舰队工坊">
+            <div class="command-heading"><span>舰队工坊</span><small>驻守 / 购买 / 升级</small></div>
+            <select id="fleet-type-select" aria-label="舰队类型">
+              <option value="assault">突击舰队 · 进攻</option>
+              <option value="guardian">守卫舰队 · 防守</option>
+              <option value="pioneer">开拓舰队 · 扩张</option>
+              <option value="raider">劫掠舰队 · 游击</option>
+            </select>
+            <div class="fleet-actions"><button id="buy-fleet" type="button">购买舰队 <span>8 信用 / 4 材料</span></button><button id="upgrade-fleet" type="button">升级驻守舰队 <span>6 信用 / 3 材料</span></button></div>
+            <p id="fleet-hint">先在地图选择己方星球，再购买或升级舰队。</p>
+          </section>
+          <section class="save-panel" aria-label="存档系统">
+            <div class="command-heading"><span>战役存档</span><small>仅保存在本机</small></div>
+            <div class="fleet-actions"><button id="save-game" type="button">保存当前进度</button><button id="load-game" type="button">读取存档</button></div>
           </section>
           <button id="end-turn" class="primary-button end-turn" type="button">结束本轮</button>
           <div class="turn-order">
