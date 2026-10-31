@@ -1,0 +1,4 @@
+.codex/
+.zip-stage/
+*.zip
+.DS_Store

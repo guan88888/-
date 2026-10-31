@@ -130,15 +130,14 @@ function createGame(seed, playerFaction) {
   const planets = PLANETS.map(p => {
     const owner = owners[p.id] || "neutral";
     const capitalFaction = Object.keys(capitals).find(f => capitals[f] === p.id) || null;
-    return {
-      ...p,
+    return Object.assign({}, p, {
       x: Math.max(8, Math.min(92, p.x + (rng() - .5) * 4)),
       y: Math.max(10, Math.min(90, p.y + (rng() - .5) * 4)),
       owner,
       fleet: capitalFaction ? 4 : owner === "neutral" ? 1 + Math.floor(rng() * 2) : 2,
       fleetType: owner === "neutral" ? "guardian" : (capitalFaction ? "guardian" : ["assault","guardian","pioneer"][Math.floor(rng()*3)]),
-      capitalFaction
-    };
+      capitalFaction: capitalFaction
+    });
   });
   return {
     seed, rng, playerFaction, round: 1, phase: "player", actions: 2, action: "expand", selectedPlanet: null, maneuverSource: null,
@@ -239,7 +238,7 @@ function renderMap() {
     button.style.setProperty("--x", `${p.x}%`);
     button.style.setProperty("--y", `${p.y}%`);
     button.setAttribute("aria-label", `${p.name}，${FACTIONS[p.owner].name}，舰队 ${p.fleet}`);
-    button.innerHTML = `<span class="planet-orb">${p.fleet}</span><strong>${p.name}</strong><small>${p.capitalFaction ? "首都" : FACTIONS[p.owner].short} · ${FLEET_TYPES[p.fleetType]?.icon || "舰"}</small>`;
+    button.innerHTML = `<span class="planet-orb">${p.fleet}</span><strong>${p.name}</strong><small>${p.capitalFaction ? "首都" : FACTIONS[p.owner].short} · ${(FLEET_TYPES[p.fleetType] && FLEET_TYPES[p.fleetType].icon) || "舰"}</small>`;
     button.addEventListener("click", () => clickPlanet(p.id));
     layer.appendChild(button);
   });
@@ -312,8 +311,8 @@ function handleManeuver(id) {
     const moved = Math.max(1, Math.floor(source.fleet / 2)); source.fleet -= moved; target.fleet += moved; target.fleetType = source.fleetType;
     log(`${moved} 支舰队从${source.name}调动至${target.name}（无视星门距离）。`, "good");
   } else if (target.owner !== "neutral" && target.owner !== "alien") {
-    const attack = source.fleet + (FLEET_TYPES[source.fleetType]?.attack || 0) + Math.floor(state.rng() * 6) - 2;
-    const defense = target.fleet + (FLEET_TYPES[target.fleetType]?.defense || 0) + Math.floor(state.rng() * 6);
+    const attack = source.fleet + ((FLEET_TYPES[source.fleetType] && FLEET_TYPES[source.fleetType].attack) || 0) + Math.floor(state.rng() * 6) - 2;
+    const defense = target.fleet + ((FLEET_TYPES[target.fleetType] && FLEET_TYPES[target.fleetType].defense) || 0) + Math.floor(state.rng() * 6);
     if (attack > defense || (state.playerFaction === "chaos" && attack === defense)) { const old = target.owner; target.owner = state.playerFaction; target.fleet = 1; target.fleetType = source.fleetType; source.fleet = Math.max(1, source.fleet - 1); log(`远程突袭${target.name}成功（${attack} : ${defense}）。`, "good"); checkCapital(target, state.playerFaction, old); }
     else { source.fleet = Math.max(1, source.fleet - 1); log(`远程突袭${target.name}失败（${attack} : ${defense}），距离造成 -2 惩罚。`, "bad"); }
   } else { state.actions++; return showToast("外星或无主目标请使用常规行动。", true); }
@@ -343,8 +342,8 @@ function performPlayerAction(target) {
 function resolveBattle(attacker, target) {
   const source = ownedBy(attacker).filter(p => neighbors(p.id).includes(target.id)).sort((a,b) => b.fleet - a.fleet)[0];
   if (!source) return;
-  const attackPower = source.fleet + 1 + Math.floor(state.rng() * 6) + (FLEET_TYPES[source.fleetType]?.attack || 0);
-  let defensePower = target.fleet + 1 + Math.floor(state.rng() * 6) + (FLEET_TYPES[target.fleetType]?.defense || 0);
+  const attackPower = source.fleet + 1 + Math.floor(state.rng() * 6) + ((FLEET_TYPES[source.fleetType] && FLEET_TYPES[source.fleetType].attack) || 0);
+  let defensePower = target.fleet + 1 + Math.floor(state.rng() * 6) + ((FLEET_TYPES[target.fleetType] && FLEET_TYPES[target.fleetType].defense) || 0);
   let finalAttack = attackPower;
   if (attacker === "alliance") finalAttack--;
   if (target.owner === "empire") defensePower++;
@@ -466,7 +465,7 @@ function renderDiplomacy() {
 
 function renderFleetPanel() {
   const p = state.selectedPlanet ? planet(state.selectedPlanet) : null;
-  $("#fleet-hint").textContent = p && p.owner === state.playerFaction ? `${p.name}：${FLEET_TYPES[p.fleetType]?.name || "舰队"} Lv${p.fleet}` : "先在地图选择己方星球，再购买或升级舰队。";
+  $("#fleet-hint").textContent = p && p.owner === state.playerFaction ? `${p.name}：${(FLEET_TYPES[p.fleetType] && FLEET_TYPES[p.fleetType].name) || "舰队"} Lv${p.fleet}` : "先在地图选择己方星球，再购买或升级舰队。";
 }
 function buyFleet() {
   const p = state.selectedPlanet ? planet(state.selectedPlanet) : null;
@@ -481,17 +480,17 @@ function upgradeFleet() {
   if (!p || p.owner !== state.playerFaction) return showToast("请选择己方星球作为升级目标。", true);
   if (state.credits < 6 || state.materials < 3) return showToast("升级所需资源不足。", true);
   state.credits -= 6; state.materials -= 3; p.fleet++;
-  log(`${p.name}的${FLEET_TYPES[p.fleetType]?.name || "舰队"}完成升级。`, "good"); renderAll();
+  log(`${p.name}的${(FLEET_TYPES[p.fleetType] && FLEET_TYPES[p.fleetType].name) || "舰队"}完成升级。`, "good"); renderAll();
 }
 function saveGame() {
   if (!state) return;
-  const snapshot = {...state, rng: null};
+  const snapshot = Object.assign({}, state, {rng: null});
   try { localStorage.setItem("stargate-save", JSON.stringify(snapshot)); state.savedAt = Date.now(); showToast("战役已保存到本机。"); } catch { showToast("存档失败。", true); }
 }
 function loadGame() {
   try {
     const raw = localStorage.getItem("stargate-save"); if (!raw) return showToast("还没有可读取的存档。", true);
-    const data = JSON.parse(raw); state = {...data, rng: mulberry32(hashSeed(data.seed + "-resume")), eventDeck: shuffle(EVENTS, mulberry32(hashSeed(data.seed + "-events"))), phase:"player", gameOver:false}; beginGame(); showToast("已读取本机存档。");
+    const data = JSON.parse(raw); state = Object.assign({}, data, {rng: mulberry32(hashSeed(data.seed + "-resume")), eventDeck: shuffle(EVENTS, mulberry32(hashSeed(data.seed + "-events"))), phase:"player", gameOver:false}); beginGame(); showToast("已读取本机存档。");
   } catch { showToast("存档读取失败。", true); }
 }
 
@@ -545,7 +544,7 @@ function renderDetail() {
   $("#selected-code").textContent = p.id.toUpperCase();
   box.className = "planet-detail";
   box.style.setProperty("--owner-color", FACTIONS[p.owner].color);
-  box.innerHTML = `<div class="detail-name"><div><h3>${p.name}</h3><p>${p.capitalFaction ? "阵营首都" : "普通星球"}</p></div><span class="owner-badge">${FACTIONS[p.owner].short}</span></div><div class="detail-stats"><div><span>舰队</span><b>${p.fleet}</b></div><div><span>类型</span><b>${FLEET_TYPES[p.fleetType]?.name || "舰队"}</b></div></div><p class="detail-trait">${p.trait}</p>`;
+  box.innerHTML = `<div class="detail-name"><div><h3>${p.name}</h3><p>${p.capitalFaction ? "阵营首都" : "普通星球"}</p></div><span class="owner-badge">${FACTIONS[p.owner].short}</span></div><div class="detail-stats"><div><span>舰队</span><b>${p.fleet}</b></div><div><span>类型</span><b>${(FLEET_TYPES[p.fleetType] && FLEET_TYPES[p.fleetType].name) || "舰队"}</b></div></div><p class="detail-trait">${p.trait}</p>`;
 }
 
 function renderActions() {
@@ -733,7 +732,7 @@ function showToast(message, error = false) {
 function showModal(id) {
   $("#modal-backdrop").hidden = false;
   $$(".modal").forEach(modal => modal.hidden = modal.id !== id);
-  setTimeout(() => $("#" + id).querySelector("button")?.focus(), 10);
+  setTimeout(() => { const button = $("#" + id).querySelector("button"); if (button) button.focus(); }, 10);
 }
 
 function closeModals() { $("#modal-backdrop").hidden = true; $$(".modal").forEach(modal => modal.hidden = true); }
